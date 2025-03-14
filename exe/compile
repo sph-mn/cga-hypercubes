@@ -1,0 +1,3 @@
+#!/bin/sh
+
+coffee --compile --bare --output src/compiled "$@" src/*.coffee
