@@ -2,13 +2,13 @@ class ui_class
   # creates the html for the controls and default options
 
   options:
-    dimensions: 3
+    dimensions: 4
     # zero elements are not rotated
     rotation_dimensions: [1, 0, 1, 1]
     # in milliseconds
-    refresh: 15000
+    refresh: 150
     # in radians
-    rotation_speed: 0.2
+    rotation_speed: 0.02
     canvas_width: 1000
     canvas_height: 800
     projection_distance: 3

@@ -1,6 +1,10 @@
 # rotating hypercube projections using conformal geometric algebra on a webgl canvas
 
-status: currently being migrated from canvas to webgl.
+status: currently being migrated from canvas to webgl. the rotation axes controls are hidden because they are not migrated.
+
+there is currently no point of reset, so the model might degenerate after a while because of floating point errors.
+
+[demo](https://sph.mn/files/u/software/sourcecode/cga-hypercubes/src/main.html)
 
 # info
 * the compiled javascript file is compiled/main.js

@@ -87,10 +87,26 @@ get_cells = (vertices, n) ->
     subcells a, k + 1 for a in indices
   subcells [0...vertices.length], 1
 
+triangulate_squares = (indices, n) ->
+  array_map_depth indices, n - 3, (a) ->
+    [[a[0][0], a[0][1], a[2][1]], [a[1][0], a[1][1], a[2][1]]]
+
+sort_vertices = (space, n, vertices, cells) ->
+  e1 = space.basis 1
+  e2 = space.basis 2
+  e3 = space.basis 3
+  ps_euc = space.ep e1, e2, e3
+  array_map_depth cells, n - 2, (a) ->
+    [p1, p2, p3] = a.map (i) -> vertices[i]
+    scalar = space.ip space.ep(p1, p2, p3), ps_euc
+    blade_scalar = space.get scalar, 0
+    orientation = if blade_scalar? then space.blade_coeff blade_scalar else 0
+    if orientation < 0 then [p1, p3, p2] else [p1, p2, p3]
+
 get_projector = (space, projection_distance, projection_angle) ->
   # perspective projection.
-  cos_half = Math.cos(projection_angle / 2)
-  sin_half = Math.sin(projection_angle / 2)
+  cos_half = Math.cos projection_angle / 2
+  sin_half = Math.sin projection_angle / 2
   rotation = space.rotor [cos_half, sin_half, space.normal, space.no(1)]
   coeff = 1 / (2 * projection_distance)
   perspective = space.rotor [1, coeff, space.normal, space.ni(1)]
@@ -102,46 +118,35 @@ get_rotator = (space, n, rotation_dimensions, rotation_speed) ->
   # rotation
   # R = cos(angle / 2) + B * sin(angle / 2)
   bivector_magnitude = Math.sin rotation_speed / 2
-  rotor_data = Array n + 1
+  rotor_data = Array rotation_dimensions.length
   rotor_data[0] = Math.cos rotation_speed / 2
   rotors = for a, i in rotation_dimensions
     continue unless a
-    rotor_data = rotor_data.fill 0, 1
-    rotor_data[i + 1] = bivector_magnitude
-    space.rotor rotor_data
-  (a) -> rotators.reduce ((a, r) -> a.sp(r)), a
-
-triangulate_squares = (indices, n) ->
-  array_map_depth indices, n - 3, (a) ->
-    [[a[0][0], a[0][1], a[2][1]], [a[1][0], a[1][1], a[2][1]]]
-
-sort_vertices = (space, n, vertices, cells) ->
-  # sort edges counter clockwise.
-  # assumes that edges are already sorted cyclically.
-  n0 = space.no 1
-  ni = space.ni 1
-  ps = space.pseudoscalar()
-  array_map_depth cells, n - 2, (a) ->
-    [p1, p2, p3] = a.map (a) -> vertices[a]
-    scalar = space.ip space.ep(p1, p2, p3, n0, ni), ps
-    console.log space.mv_to_string(space.ep(p1, p2, p3, n0, ni)), space.mv_to_string(ps)
-    console.log "ip", space.ip space.ep(p1, p2, p3, n0, ni), ps
-    blade_scalar = space.get scalar, 0
-    orientation = if blade_scalar? then space.blade_coeff blade_scalar else 0
-    if orientation < 0 then [p1, p3, p2] else [p1, p2, p3]
+    data = rotor_data.fill 0, 1
+    data[i + 1] = bivector_magnitude
+    space.rotor data
+  (a) ->
+    rotors.reduce ((b, r) -> space.sp(r, b)), a
 
 get_cube = (options) ->
   n = options.dimensions
-  space = new sph_ga [1, 1, 1], conformal: true
-  rotation_dimensions = options.rotation_dimensions.slice 0, n
+  space = new sph_ga n, conformal: true
+  rotation_dimensions = options.rotation_dimensions.slice 0, space.rotation_axes.length
+  rotation_dimensions.push 0 while rotation_dimensions.length < space.rotation_axes.length
   rotator = get_rotator space, n, rotation_dimensions, options.rotation_speed
   projector = get_projector space, options.projection_distance, options.projection_angle
   bit_vertices = [0...2 ** n]
   vertices = bit_vertices.map (a) -> space.point bits_to_array a, n
+  indices = []
+  for i in bit_vertices
+    for d in [0...n]
+      if not (i & (1 << d))
+        indices.push i, i + (1 << d)
+  indices = new Uint16Array indices
   cells = get_cells bit_vertices, n
   cells = triangulate_squares cells, n
   cells = sort_vertices space, n, vertices, cells
-  {space, rotator, projector, vertices}
+  {space, rotator, projector, vertices, indices}
 
 vertex_shader_source = """
 #version 300 es
@@ -160,13 +165,13 @@ out vec4 fragment_color;
 
 fragment_shader_wireframe_source = fragment_shader_defaults + """
 void main() {
-  fragment_color = vec4(1.0, 0.0, 0.0, 1.0);
+  fragment_color = vec4(0.2, 0.4, 0.6, 1.0);
 }
 """
 
 fragment_shader_solid_source = fragment_shader_defaults + """
 void main() {
-  fragment_color = vec4(1.0, 1.0, 1.0, 1.0);
+  fragment_color = vec4(1.0, 0.4, 1.0, 1.0);
 }
 """
 
@@ -189,52 +194,64 @@ gl_create_program = (gl, vertex_shader, fragment_shader) ->
      gl.deleteProgram a
   a
 
+resize_canvas = (canvas) ->
+  ratio = window.devicePixelRatio or 1
+  width = canvas.clientWidth * ratio
+  height = canvas.clientHeight * ratio
+  if canvas.width != width or canvas.height != height
+    canvas.width = width
+    canvas.height = height
+
 gl_initialize = (canvas) ->
+  resize_canvas canvas
   gl = canvas.getContext "webgl2"
   unless gl
     alert "unable to initialize webgl2. your browser may not support it."
     return
-  gl.viewport 0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight
+  vao = gl.createVertexArray()
+  gl.bindVertexArray vao
+  gl.viewport 0, 0, canvas.width, canvas.height
   gl.clearColor 0, 0, 0, 1
-  gl.bindBuffer gl.ARRAY_BUFFER, gl.createBuffer()
-  gl.bindBuffer gl.ELEMENT_ARRAY_BUFFER, gl.createBuffer()
+  vbo = gl.createBuffer()
+  gl.bindBuffer gl.ARRAY_BUFFER, vbo
+  ibo = gl.createBuffer()
+  gl.bindBuffer gl.ELEMENT_ARRAY_BUFFER, ibo
   vertex_shader = gl_create_shader gl, "VERTEX_SHADER", vertex_shader_source
   fragment_shader_wireframe = gl_create_shader gl, "FRAGMENT_SHADER", fragment_shader_wireframe_source
   fragment_shader_solid = gl_create_shader gl, "FRAGMENT_SHADER", fragment_shader_solid_source
   program_wireframe = gl_create_program gl, vertex_shader, fragment_shader_wireframe
   program_solid = gl_create_program gl, vertex_shader, fragment_shader_solid
-  # link position variable to array_buffer
-  position_attribute_location = gl.getAttribLocation program_wireframe, "position"
-  gl.enableVertexAttribArray position_attribute_location
-  gl.vertexAttribPointer position_attribute_location, 3, gl.FLOAT, false, 0, 0
+  pos_loc = gl.getAttribLocation program_wireframe, "position"
+  gl.enableVertexAttribArray pos_loc
+  gl.vertexAttribPointer pos_loc, 3, gl.FLOAT, false, 0, 0
   gl.enable gl.CULL_FACE
-  gl
+  [gl, program_wireframe, program_solid, vao, ibo, vbo]
 
 render_rotating_cube = (options) ->
   # object -> interval
   # repeatedly draw and rotate a cube.
-  # various vector formats are used:
-  # - cell finding: integer bitvectors
-  # - transformations: sph-ga vectors
-  # - vertex sorting: integer arrays
-  # - webgl: float32arrays
-  n = options.dimensions
   cube = get_cube options
-  return
-  gl = gl_initialize options.canvas
-  gl.bufferData gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW
-  final_vertices = new Float32Array vertices.length
+  [gl, program_wireframe, program_solid, vao, ibo, vbo] = gl_initialize options.canvas
+  gl.bufferData gl.ELEMENT_ARRAY_BUFFER, cube.indices, gl.STATIC_DRAW
+  final_vertices = new Float32Array cube.vertices.length * 3
+  vertices = cube.vertices.slice()
   draw = () ->
-    for i in [0...vertices.length]
-      vertices[i] = transform vertices[i]
-      final_vertices[i] = project vertices[i]
-    gl.bufferData gl.ARRAY_BUFFER, vertices, gl.DYNAMIC_DRAW
+    for i in [0...cube.vertices.length]
+      rotated = cube.rotator vertices[i]
+      vertices[i] = rotated
+      projected = cube.projector rotated
+      a = cube.space.point_euclidean projected
+      final_vertices[i * 3] = a[0] * 0.5
+      final_vertices[i * 3 + 1] = a[1] * 0.5
+      final_vertices[i * 3 + 2] = a[2] * 0.5
+    gl.bufferData gl.ARRAY_BUFFER, final_vertices, gl.DYNAMIC_DRAW
     gl.clear gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT
-    #gl.useProgram program_wireframe
-    #gl.drawElements gl.LINES, indices.length, gl.UNSIGNED_SHORT, 0
-    #if false
-    #  gl.useProgram program_solid
-    #  gl.drawElements gl.TRIANGLES, faces.length, gl.UNSIGNED_SHORT, 0
+    gl.useProgram program_wireframe
+    gl.bindVertexArray vao
+    gl.drawElements gl.LINES, cube.indices.length, gl.UNSIGNED_SHORT, 0
+    #gl.drawArrays gl.POINTS, 0, cube.vertices.length
+    err = gl.getError()
+    console.error "gl error:", err if err != gl.NO_ERROR
   draw()
   options.canvas.addEventListener "click", (event) -> draw()
   previous_time = -options.refresh
@@ -256,4 +273,4 @@ node_run = () ->
   cube = get_cube options
   console.log cube
 
-node_run()
+#node_run()

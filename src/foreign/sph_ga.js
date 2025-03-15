@@ -6,6 +6,7 @@ sph_ga = (function() {
   class sph_ga {
     constructor(metric, options = {}) {
       var ref, ref1, rotation_axis_combinations;
+      metric = Number.isInteger(metric) ? Array(metric).fill(1) : metric;
       this.n = metric.length;
       this.is_conformal = !!options.conformal;
       if (!Array.isArray(metric[0])) {
@@ -128,6 +129,27 @@ sph_ga = (function() {
             return results;
           })()) / 2;
           return this.vector([0].concat(euclidean_coeffs).concat([1, ni_coeff]));
+        };
+        this.point_euclidean = function(a) {
+          var b, c, d, l, len, n0, results;
+          n0 = this.blade_coeff(this.get(a, this.no_id));
+          c = (function() {
+            var l, len, results;
+            results = [];
+            for (l = 0, len = a.length; l < len; l++) {
+              b = a[l];
+              if (1 === b[2] && !(b[0] === this.no_id || b[0] === this.ni_id)) {
+                results.push(b[1]);
+              }
+            }
+            return results;
+          }).call(this);
+          results = [];
+          for (l = 0, len = c.length; l < len; l++) {
+            d = c[l];
+            results.push(d / n0);
+          }
+          return results;
         };
         this.normal = this.vector([0].concat(Array(this.n).fill(1 / Math.sqrt(this.n))));
       }
@@ -614,7 +636,7 @@ sph_ga = (function() {
       };
       ip_equal_grade = (a, b) => {
         var i, j, m, s;
-        // For 1-blades use the metric directly.
+        // for 1-blades use the metric directly.
         if (a.length === 1) {
           return this.s(this.metric[a[0]][b[0]]);
         } else {

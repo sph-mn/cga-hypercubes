@@ -14,15 +14,17 @@
      html{font-size: 16px; line-height: 20px; font-family: monospace}
      h1,h2,h3,h4,h5,h6{font-weight: bold}
      label > input{margin-left: 8px;width:5rem}
+     #controls{display:none}
     </style>
   </head>
   <body style="background-color:#fff">
     <h1>rotating n-cube projections</h1>
+    currently being migrated to webGL - incomplete preview
     <div id="controls"></div>
     <canvas></canvas>
     <div>
-      <a target="_blank" href="http://sph.mn">by sph.mn</a>
-      <a target="_blank" href="https://github.com/sph-mn/sph-other/tree/master/cga-hypercubes">source</a>
+      <p>Uses conformal geometric algebra for rotation and projection, and webGL for graphics.</p>
+      <a target="_blank" href="https://github.com/sph-mn/cga-hypercubes">source</a>
     </div>
     <script>
       new ui_class(render_rotating_cube)
