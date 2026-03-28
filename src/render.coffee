@@ -172,7 +172,7 @@ class ui_class
     @dom.display_scale = crel "input",
       type: "number"
       min: "0.01"
-      step: "0.1"
+      step: "0.01"
       value: @options.display_scale
     @dom.surface_alpha = crel "input",
       type: "number"
