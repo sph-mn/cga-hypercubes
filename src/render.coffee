@@ -123,9 +123,9 @@ class ui_class
     rotation_dimensions: @get_default_rotation_dimensions dimensions
     refresh: 16
     rotation_speed: Math.PI * 0.08
-    projection_depth: 10
-    display_scale: 0.4
-    surface_alpha: 0.65
+    projection_depth: 4
+    display_scale: 0.3
+    surface_alpha: 0.5
     area_epsilon: 1e-7
     surfaces_enabled: true
     wireframe_enabled: true
@@ -162,6 +162,7 @@ class ui_class
     @dom.refresh = crel "input",
       type: "number"
       min: "1"
+      step: "50"
       value: @options.refresh
     @dom.projection_depth = crel "input",
       type: "number"
@@ -171,30 +172,30 @@ class ui_class
     @dom.display_scale = crel "input",
       type: "number"
       min: "0.01"
-      step: "0.01"
+      step: "0.1"
       value: @options.display_scale
     @dom.surface_alpha = crel "input",
       type: "number"
       min: "0"
       max: "1"
-      step: "0.01"
+      step: "0.1"
       value: @options.surface_alpha
     @dom.surfaces_enabled = crel "input", type: "checkbox"
     @dom.surfaces_enabled.checked = @options.surfaces_enabled
     @dom.wireframe_enabled = crel "input", type: "checkbox"
     @dom.wireframe_enabled.checked = @options.wireframe_enabled
-    @dom.rotation_planes = crel "div"
+    @dom.rotation_planes = crel "span"
     @dom.controls_root = crel "div"
     root = @dom.controls_root
     root.appendChild @label "dimensions", @dom.dimensions
-    root.appendChild crel "div", "rotation_planes", @dom.rotation_planes
-    root.appendChild @label "speed_pi_per_second", @dom.rotation_speed
-    root.appendChild @label "refresh_ms", @dom.refresh
-    root.appendChild @label "projection_depth", @dom.projection_depth
-    root.appendChild @label "display_scale", @dom.display_scale
-    root.appendChild @label "surface_alpha", @dom.surface_alpha
+    root.appendChild @label "speed", @dom.rotation_speed
+    #root.appendChild @label "refresh", @dom.refresh
+    root.appendChild @label "depth", @dom.projection_depth
+    root.appendChild @label "scale", @dom.display_scale
+    root.appendChild @label "alpha", @dom.surface_alpha
     root.appendChild @label "surfaces", @dom.surfaces_enabled
     root.appendChild @label "wireframe", @dom.wireframe_enabled
+    root.appendChild crel "div", "rotation_planes", @dom.rotation_planes
     document.getElementById("controls").appendChild root
   bind_events: ->
     @dom.dimensions.addEventListener "change", @on_dimensions_change
@@ -228,7 +229,7 @@ class ui_class
       checkbox = crel "input", type: "checkbox"
       checkbox.checked = !!@options.rotation_dimensions[plane_index]
       checkbox.addEventListener "change", @commit
-      wrapper = crel "label", "plane_#{axis_a}_#{axis_b}", checkbox
+      wrapper = crel "label", checkbox
       @dom.rotation_planes.appendChild wrapper
       @dom.rotation_dimension_inputs.push checkbox
   commit: =>

@@ -162,9 +162,9 @@ ui_class = class ui_class {
       rotation_dimensions: this.get_default_rotation_dimensions(dimensions),
       refresh: 16,
       rotation_speed: Math.PI * 0.08,
-      projection_depth: 10,
-      display_scale: 0.4,
-      surface_alpha: 0.65,
+      projection_depth: 4,
+      display_scale: 0.3,
+      surface_alpha: 0.5,
       area_epsilon: 1e-7,
       surfaces_enabled: true,
       wireframe_enabled: true
@@ -230,6 +230,7 @@ ui_class = class ui_class {
     this.dom.refresh = crel("input", {
       type: "number",
       min: "1",
+      step: "50",
       value: this.options.refresh
     });
     this.dom.projection_depth = crel("input", {
@@ -241,14 +242,14 @@ ui_class = class ui_class {
     this.dom.display_scale = crel("input", {
       type: "number",
       min: "0.01",
-      step: "0.01",
+      step: "0.1",
       value: this.options.display_scale
     });
     this.dom.surface_alpha = crel("input", {
       type: "number",
       min: "0",
       max: "1",
-      step: "0.01",
+      step: "0.1",
       value: this.options.surface_alpha
     });
     this.dom.surfaces_enabled = crel("input", {
@@ -259,18 +260,18 @@ ui_class = class ui_class {
       type: "checkbox"
     });
     this.dom.wireframe_enabled.checked = this.options.wireframe_enabled;
-    this.dom.rotation_planes = crel("div");
+    this.dom.rotation_planes = crel("span");
     this.dom.controls_root = crel("div");
     root = this.dom.controls_root;
     root.appendChild(this.label("dimensions", this.dom.dimensions));
-    root.appendChild(crel("div", "rotation_planes", this.dom.rotation_planes));
-    root.appendChild(this.label("speed_pi_per_second", this.dom.rotation_speed));
-    root.appendChild(this.label("refresh_ms", this.dom.refresh));
-    root.appendChild(this.label("projection_depth", this.dom.projection_depth));
-    root.appendChild(this.label("display_scale", this.dom.display_scale));
-    root.appendChild(this.label("surface_alpha", this.dom.surface_alpha));
+    root.appendChild(this.label("speed", this.dom.rotation_speed));
+    //root.appendChild @label "refresh", @dom.refresh
+    root.appendChild(this.label("depth", this.dom.projection_depth));
+    root.appendChild(this.label("scale", this.dom.display_scale));
+    root.appendChild(this.label("alpha", this.dom.surface_alpha));
     root.appendChild(this.label("surfaces", this.dom.surfaces_enabled));
     root.appendChild(this.label("wireframe", this.dom.wireframe_enabled));
+    root.appendChild(crel("div", "rotation_planes", this.dom.rotation_planes));
     return document.getElementById("controls").appendChild(root);
   }
 
@@ -318,7 +319,7 @@ ui_class = class ui_class {
       });
       checkbox.checked = !!this.options.rotation_dimensions[plane_index];
       checkbox.addEventListener("change", this.commit);
-      wrapper = crel("label", `plane_${axis_a}_${axis_b}`, checkbox);
+      wrapper = crel("label", checkbox);
       this.dom.rotation_planes.appendChild(wrapper);
       results.push(this.dom.rotation_dimension_inputs.push(checkbox));
     }
