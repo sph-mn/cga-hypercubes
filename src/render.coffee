@@ -63,6 +63,7 @@ class renderer_class
       rotation_dimensions: options.rotation_dimensions.slice()
       refresh: options.refresh
       rotation_speed: options.rotation_speed
+      rotation_speed_factors: options.rotation_speed_factors.slice()
       projection_depth: options.projection_depth
       display_scale: options.display_scale
       surface_alpha: options.surface_alpha
@@ -120,29 +121,16 @@ class ui_class
   get_default_options: ->
     dimensions = 4
     dimensions: dimensions
-    rotation_dimensions: @get_default_rotation_dimensions dimensions
-    refresh: 16
-    rotation_speed: Math.PI * 0.08
+    rotation_dimensions: helper.get_default_rotation_dimensions dimensions
+    rotation_speed: Math.PI * 0.1
+    rotation_speed_factors: helper.get_default_rotation_speed_factors dimensions
+    refresh: 8
     projection_depth: 4
     display_scale: 0.3
     surface_alpha: 0.5
     area_epsilon: 1e-7
     surfaces_enabled: true
     wireframe_enabled: true
-  get_default_rotation_dimensions: (dimensions) ->
-    Array(dimensions * (dimensions - 1) / 2).fill 1
-  normalize_rotation_dimensions: (dimensions, rotation_dimensions) ->
-    plane_count = dimensions * (dimensions - 1) / 2
-    result = rotation_dimensions.slice 0, plane_count
-    result.push 1 while result.length < plane_count
-    result
-  get_rotation_planes: (dimensions) ->
-    planes = []
-    for axis_a in [1..dimensions]
-      for axis_b in [1..dimensions]
-        continue unless axis_a < axis_b
-        planes.push [axis_a, axis_b]
-    planes
   label: (text, content) ->
     crel "label", text, content
   read_number: (input, fallback) ->
@@ -207,21 +195,22 @@ class ui_class
     @dom.surfaces_enabled.addEventListener "change", @commit
     @dom.wireframe_enabled.addEventListener "change", @commit
   on_dimensions_change: =>
+    old_dimensions = @options.dimensions
     dimensions = Math.floor @read_number @dom.dimensions, @options.dimensions
     dimensions = Math.max 1, dimensions
-    if 7 < dimensions
-      alert "the current maximum number of dimensions is 7."
-      dimensions = 7
+    if 10 < dimensions
+      dimensions = 10
     if not @warning_shown and 6 <= dimensions
       alert "increasing dimensions can easily overload the browser."
       @warning_shown = true
+    @options.rotation_dimensions = helper.merge_rotation_dimensions old_dimensions, dimensions, @options.rotation_dimensions
+    @options.rotation_speed_factors = helper.merge_rotation_speed_factors old_dimensions, dimensions, @options.rotation_speed_factors
     @options.dimensions = dimensions
-    @options.rotation_dimensions = @normalize_rotation_dimensions dimensions, @options.rotation_dimensions
     @dom.dimensions.value = dimensions
     @sync_rotation_plane_controls()
     @commit()
   sync_rotation_plane_controls: ->
-    rotation_planes = @get_rotation_planes @options.dimensions
+    rotation_planes = helper.get_rotation_planes @options.dimensions
     @dom.rotation_planes.innerHTML = ""
     @dom.rotation_dimension_inputs = []
     for plane, plane_index in rotation_planes
@@ -236,7 +225,8 @@ class ui_class
     @options.dimensions = Math.floor @read_number @dom.dimensions, @options.dimensions
     @options.rotation_dimensions = @dom.rotation_dimension_inputs.map (checkbox) ->
       if checkbox.checked then 1 else 0
-    @options.rotation_dimensions = @normalize_rotation_dimensions @options.dimensions, @options.rotation_dimensions
+    @options.rotation_dimensions = helper.normalize_rotation_dimensions @options.dimensions, @options.rotation_dimensions
+    @options.rotation_speed_factors = helper.normalize_rotation_speed_factors @options.dimensions, @options.rotation_speed_factors
     @options.rotation_speed = Math.PI * @read_number @dom.rotation_speed, @options.rotation_speed / Math.PI
     @options.refresh = Math.max 1, Math.floor(@read_number @dom.refresh, @options.refresh)
     @options.projection_depth = Math.max 1, @read_number @dom.projection_depth, @options.projection_depth

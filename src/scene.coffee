@@ -1,17 +1,74 @@
 sph_ga = require "./foreign/sph_ga.js" unless window?
+helper =
+  get_rotation_planes: (dimensions) ->
+    if 2 is dimensions
+      return [[1, 2]]
+    if dimensions < 2
+      return []
+    planes = [[2, 3], [1, 3], [1, 2]]
+    if 4 <= dimensions
+      for axis_b in [4..dimensions]
+        for axis_a in [1...axis_b]
+          planes.push [axis_a, axis_b]
+    planes
+  get_rotation_plane_count: (dimensions) ->
+    @get_rotation_planes(dimensions).length
+  get_default_rotation_dimensions: (dimensions) ->
+    planes = @get_rotation_planes dimensions
+    planes.map ([axis_a, axis_b]) ->
+      if axis_a is 2 and axis_b is 3
+        return 1
+      if axis_a is 1 and axis_b is 3
+        return 1
+      if 4 <= axis_b and axis_a is axis_b - 1
+        return 1
+      0
+  normalize_rotation_dimensions: (dimensions, values) ->
+    plane_count = @get_rotation_plane_count dimensions
+    result = values.slice 0, plane_count
+    result.push 0 while result.length < plane_count
+    result
+  get_default_rotation_speed_factors: (dimensions) ->
+    planes = @get_rotation_planes dimensions
+    golden = 1.61803398875
+    planes.map ([axis_a, axis_b], i) ->
+      base = (i * golden) % 1
+      sign = if i % 2 then -1 else 1
+      sign * (0.5 + base)
+  normalize_rotation_speed_factors: (dimensions, values) ->
+    plane_count = @get_rotation_plane_count dimensions
+    result = values.slice 0, plane_count
+    result.push 1 while result.length < plane_count
+    result
+  merge_plane_values: (old_dimensions, new_dimensions, old_values, default_values) ->
+    old_planes = @get_rotation_planes old_dimensions
+    new_planes = @get_rotation_planes new_dimensions
+    old_map = {}
+    for plane, plane_index in old_planes
+      old_map[plane.join "_"] = old_values[plane_index]
+    new_planes.map (plane, plane_index) ->
+      key = plane.join "_"
+      if old_map[key]? then old_map[key] else default_values[plane_index]
+  merge_rotation_dimensions: (old_dimensions, new_dimensions, old_values) ->
+    defaults = helper.get_default_rotation_dimensions new_dimensions
+    @merge_plane_values old_dimensions, new_dimensions, old_values, defaults
+  merge_rotation_speed_factors: (old_dimensions, new_dimensions, old_values) ->
+    defaults = helper.get_default_rotation_speed_factors new_dimensions
+    @merge_plane_values old_dimensions, new_dimensions, old_values, defaults
 class scene_class
   constructor: (options) ->
     @set_options options
   set_options: (options) ->
     @dimensions = options.dimensions
-    @rotation_dimensions = @normalize_rotation_dimensions options.rotation_dimensions
+    @rotation_dimensions = helper.normalize_rotation_dimensions @dimensions, options.rotation_dimensions
     @rotation_speed = options.rotation_speed
+    @rotation_speed_factors = helper.normalize_rotation_speed_factors @dimensions, options.rotation_speed_factors
     @projection_depth = options.projection_depth
     @display_scale = options.display_scale
     @surface_alpha = options.surface_alpha
     @metric = @make_metric()
     @cga = new sph_ga @metric, conformal: true
-    @rotation_planes = @get_rotation_planes()
+    @rotation_planes = helper.get_rotation_planes @dimensions
     @basis_ids = @build_basis_ids()
     @base_points = @build_base_points()
     @edge_indices = @build_edge_indices()
@@ -23,20 +80,7 @@ class scene_class
     @projected_positions = new Float32Array @vertex_count * 3
     @solid_positions = new Float32Array @square_count * 18
     @coord_buffer = new Float64Array @dimensions
-  make_metric: ->
-    Array(@dimensions).fill 1
-  get_rotation_planes: ->
-    planes = []
-    for axis_a in [1..@dimensions]
-      for axis_b in [1..@dimensions]
-        continue unless axis_a < axis_b
-        planes.push [axis_a, axis_b]
-    planes
-  normalize_rotation_dimensions: (rotation_dimensions) ->
-    plane_count = @dimensions * (@dimensions - 1) / 2
-    result = rotation_dimensions.slice 0, plane_count
-    result.push 1 while result.length < plane_count
-    result
+  make_metric: -> Array(@dimensions).fill 1
   build_basis_ids: ->
     basis_ids = new Array @dimensions + 1
     for dimension in [1..@dimensions]
@@ -159,7 +203,9 @@ class scene_class
     for enabled, plane_index in @rotation_dimensions
       continue unless enabled
       [axis_a, axis_b] = @rotation_planes[plane_index]
-      half_angle = time_seconds * @rotation_speed * 0.5
+      speed_factor = @rotation_speed_factors[plane_index]
+      angle = time_seconds * @rotation_speed * speed_factor
+      half_angle = angle * 0.5
       rotor_component = @cga.add(
         @cga.s(Math.cos half_angle),
         @cga.mv([[[axis_a, axis_b], -Math.sin half_angle]])

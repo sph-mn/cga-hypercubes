@@ -79,6 +79,7 @@ renderer_class = class renderer_class {
       rotation_dimensions: options.rotation_dimensions.slice(),
       refresh: options.refresh,
       rotation_speed: options.rotation_speed,
+      rotation_speed_factors: options.rotation_speed_factors.slice(),
       projection_depth: options.projection_depth,
       display_scale: options.display_scale,
       surface_alpha: options.surface_alpha,
@@ -159,9 +160,10 @@ ui_class = class ui_class {
     dimensions = 4;
     return {
       dimensions: dimensions,
-      rotation_dimensions: this.get_default_rotation_dimensions(dimensions),
-      refresh: 16,
-      rotation_speed: Math.PI * 0.08,
+      rotation_dimensions: helper.get_default_rotation_dimensions(dimensions),
+      rotation_speed: Math.PI * 0.1,
+      rotation_speed_factors: helper.get_default_rotation_speed_factors(dimensions),
+      refresh: 8,
       projection_depth: 4,
       display_scale: 0.3,
       surface_alpha: 0.5,
@@ -169,34 +171,6 @@ ui_class = class ui_class {
       surfaces_enabled: true,
       wireframe_enabled: true
     };
-  }
-
-  get_default_rotation_dimensions(dimensions) {
-    return Array(dimensions * (dimensions - 1) / 2).fill(1);
-  }
-
-  normalize_rotation_dimensions(dimensions, rotation_dimensions) {
-    var plane_count, result;
-    plane_count = dimensions * (dimensions - 1) / 2;
-    result = rotation_dimensions.slice(0, plane_count);
-    while (result.length < plane_count) {
-      result.push(1);
-    }
-    return result;
-  }
-
-  get_rotation_planes(dimensions) {
-    var axis_a, axis_b, i, j, planes, ref, ref1;
-    planes = [];
-    for (axis_a = i = 1, ref = dimensions; (1 <= ref ? i <= ref : i >= ref); axis_a = 1 <= ref ? ++i : --i) {
-      for (axis_b = j = 1, ref1 = dimensions; (1 <= ref1 ? j <= ref1 : j >= ref1); axis_b = 1 <= ref1 ? ++j : --j) {
-        if (!(axis_a < axis_b)) {
-          continue;
-        }
-        planes.push([axis_a, axis_b]);
-      }
-    }
-    return planes;
   }
 
   label(text, content) {
@@ -242,7 +216,7 @@ ui_class = class ui_class {
     this.dom.display_scale = crel("input", {
       type: "number",
       min: "0.01",
-      step: "0.1",
+      step: "0.01",
       value: this.options.display_scale
     });
     this.dom.surface_alpha = crel("input", {
@@ -287,19 +261,20 @@ ui_class = class ui_class {
   }
 
   on_dimensions_change() {
-    var dimensions;
+    var dimensions, old_dimensions;
+    old_dimensions = this.options.dimensions;
     dimensions = Math.floor(this.read_number(this.dom.dimensions, this.options.dimensions));
     dimensions = Math.max(1, dimensions);
-    if (7 < dimensions) {
-      alert("the current maximum number of dimensions is 7.");
-      dimensions = 7;
+    if (10 < dimensions) {
+      dimensions = 10;
     }
     if (!this.warning_shown && 6 <= dimensions) {
       alert("increasing dimensions can easily overload the browser.");
       this.warning_shown = true;
     }
+    this.options.rotation_dimensions = helper.merge_rotation_dimensions(old_dimensions, dimensions, this.options.rotation_dimensions);
+    this.options.rotation_speed_factors = helper.merge_rotation_speed_factors(old_dimensions, dimensions, this.options.rotation_speed_factors);
     this.options.dimensions = dimensions;
-    this.options.rotation_dimensions = this.normalize_rotation_dimensions(dimensions, this.options.rotation_dimensions);
     this.dom.dimensions.value = dimensions;
     this.sync_rotation_plane_controls();
     return this.commit();
@@ -307,7 +282,7 @@ ui_class = class ui_class {
 
   sync_rotation_plane_controls() {
     var axis_a, axis_b, checkbox, i, len, plane, plane_index, results, rotation_planes, wrapper;
-    rotation_planes = this.get_rotation_planes(this.options.dimensions);
+    rotation_planes = helper.get_rotation_planes(this.options.dimensions);
     this.dom.rotation_planes.innerHTML = "";
     this.dom.rotation_dimension_inputs = [];
     results = [];
@@ -335,7 +310,8 @@ ui_class = class ui_class {
         return 0;
       }
     });
-    this.options.rotation_dimensions = this.normalize_rotation_dimensions(this.options.dimensions, this.options.rotation_dimensions);
+    this.options.rotation_dimensions = helper.normalize_rotation_dimensions(this.options.dimensions, this.options.rotation_dimensions);
+    this.options.rotation_speed_factors = helper.normalize_rotation_speed_factors(this.options.dimensions, this.options.rotation_speed_factors);
     this.options.rotation_speed = Math.PI * this.read_number(this.dom.rotation_speed, this.options.rotation_speed / Math.PI);
     this.options.refresh = Math.max(1, Math.floor(this.read_number(this.dom.refresh, this.options.refresh)));
     this.options.projection_depth = Math.max(1, this.read_number(this.dom.projection_depth, this.options.projection_depth));
