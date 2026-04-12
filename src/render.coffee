@@ -1,5 +1,5 @@
 class renderer_class
-  constructor: (canvas, options) ->
+  constructor: (canvas) ->
     @canvas = canvas
     @gl = @canvas.getContext "webgl2"
     unless @gl
@@ -28,7 +28,6 @@ class renderer_class
     @phase_time = 0
     @previous_frame_time = -1e18
     @frame_id = 0
-    @set_options options
     @on_frame = (time) =>
       if @options.refresh <= time - @previous_frame_time
         @previous_frame_time = time
@@ -113,7 +112,7 @@ class ui_class
     @warning_shown = false
     @dom = {}
     @options = @get_default_options()
-    @renderer = new renderer_class @canvas, @options
+    @renderer = new renderer_class @canvas
     @build_controls()
     @sync_rotation_plane_controls()
     @bind_events()
@@ -221,10 +220,17 @@ class ui_class
       wrapper = crel "label", checkbox
       @dom.rotation_planes.appendChild wrapper
       @dom.rotation_dimension_inputs.push checkbox
+  get_renderer_options: ->
+    depth = @options.projection_depth
+    steps = Math.max 0, @options.dimensions - 4
+    factor = Math.pow depth / (depth - 1), steps * 0.7
+    options = Object.create @options
+    options.projection_depth = depth * factor
+    options.display_scale = @options.display_scale / factor
+    options
   commit: =>
     @options.dimensions = Math.floor @read_number @dom.dimensions, @options.dimensions
-    @options.rotation_dimensions = @dom.rotation_dimension_inputs.map (checkbox) ->
-      if checkbox.checked then 1 else 0
+    @options.rotation_dimensions = @dom.rotation_dimension_inputs.map (checkbox) -> if checkbox.checked then 1 else 0
     @options.rotation_dimensions = helper.normalize_rotation_dimensions @options.dimensions, @options.rotation_dimensions
     @options.rotation_speed_factors = helper.normalize_rotation_speed_factors @options.dimensions, @options.rotation_speed_factors
     @options.rotation_speed = Math.PI * @read_number @dom.rotation_speed, @options.rotation_speed / Math.PI
@@ -234,7 +240,7 @@ class ui_class
     @options.surface_alpha = Math.min 1, Math.max 0, @read_number(@dom.surface_alpha, @options.surface_alpha)
     @options.surfaces_enabled = @dom.surfaces_enabled.checked
     @options.wireframe_enabled = @dom.wireframe_enabled.checked
-    @renderer.set_options @options
+    @renderer.set_options @get_renderer_options()
 render_rotating_cube = (options) ->
   new renderer_class options.canvas, options
 window.renderer_class = renderer_class if window?
